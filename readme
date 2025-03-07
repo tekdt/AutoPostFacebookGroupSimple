@@ -1,11 +1,11 @@
-#Auto Post Facebook Group Simple
+# Auto Post Facebook Group Simple
 Tác giả: TekDT
 Email: dinhtrungtek@gmail.com
 Mô tả: Phần mềm tự động đăng bài lên Facebook với nội dung tạo tự động bằng AI, hỗ trợ chuyển đổi tài khoản facebook phụ và hỗ trợ tải lên hình ảnh.
 Phiên bản: 1.0
 Ngày phát hành: 3/3/2023
 
-#Hướng dẫn cài đặt
+# Hướng dẫn cài đặt
 * Chạy trực tiếp từ script python
 - Cài đặt Python3: https://www.python.org/downloads/
 - Cài đặt thư viện cần thiết: webdriver, EC, BeautifulSoup, Groq, psutil bằng câu lệnh python py -m pip install <tên thư viện>
@@ -15,7 +15,7 @@ Các phần mềm cũng có thể cài đặt tự động theo phần mềm Tek
 * Chạy trực tiếp từ file EXE đã biên dịch (khuyến khích).
 - Chỉ cần cài đặt Chrome: https://www.google.com/intl/vi_vn/chrome/
 
-#Hướng dẫn sử dụng
+# Hướng dẫn sử dụng
 Ở giao diện chương trình sẽ có tổng cộng 5 tab, bao gồm: Facebook, Groq AI, Hình ảnh, Thông tin phần mềm và Thiết lập.
 - Tab Facebook: Thiết lập cơ bản về facebook
 + Email: Hãy nhập user facebook bạn ở đây, có thể là số điện thoại hoặc Email.
