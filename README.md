@@ -62,3 +62,5 @@ Mọi liên lạc của bạn với TekDT sẽ rất hoan nghênh và đón nh�
 # Đóng góp:
 Để phần mềm/script ngày càng hoàn thiện và nhiều tính năng hơn. TekDT cũng cần có động lực để duy trì. Nếu phần mềm/script này có ích với công việc của bạn, hãy đóng góp một chút. TekDT rất cảm kích việc làm chân thành này của bạn.
 - MOMO: https://me.momo.vn/TekDT1152
+- Biance ID: 877691831
+- USDT (BEP20): 0x53a4f3c22de1caf465ee7b5b6ef26aed9749c721
