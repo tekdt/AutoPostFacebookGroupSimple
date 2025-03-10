@@ -1,11 +1,11 @@
 
 # Auto Post Facebook Group Simple
 
-Tác giả: TekDT
-Email: dinhtrungtek@gmail.com
-Mô tả: Phần mềm tự động đăng bài lên Facebook với nội dung tạo tự động bằng AI, hỗ trợ chuyển đổi tài khoản facebook phụ và hỗ trợ tải lên hình ảnh.
-Phiên bản: 1.0
-Ngày phát hành: 3/3/2023
+- Tác giả: TekDT
+- Email: dinhtrungtek@gmail.com
+- Mô tả: Phần mềm tự động đăng bài lên Facebook với nội dung tạo tự động bằng AI, hỗ trợ chuyển đổi tài khoản facebook phụ và hỗ trợ tải lên hình ảnh.
+- Phiên bản: 1.0
+- Ngày phát hành: 3/3/2023
 
 # Hướng dẫn cài đặt
 * Chạy trực tiếp từ script python
