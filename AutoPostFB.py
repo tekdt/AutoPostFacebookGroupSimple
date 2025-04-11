@@ -454,6 +454,7 @@ class FetchDataThread(QThread):
 class PostingThread(QThread):
     status_updated = pyqtSignal(str)
     content_updated = pyqtSignal(str)
+    stop_requested = pyqtSignal()
     
     def __init__(self, window, location, valid_urls, parent=None):
         super().__init__(parent)
@@ -516,7 +517,7 @@ class PostingThread(QThread):
         for url in urls:
             if stop_event.is_set():
                 self.status_updated.emit(self.window.translate("PostingThread_stopping"))
-                break
+                return
             driver.get(url)
             time.sleep(5)
 
@@ -536,7 +537,8 @@ class PostingThread(QThread):
                     content = self.window.get_random_content_from_json()
                     if not content:
                         self.status_updated.emit(self.window.translate("PostingThread_not_found_backup_content"))
-                        self.window.stop_posting()
+                        # self.window.stop_posting()
+                        self.stop_requested.emit()
                         return
                     self.content_updated.emit(content)
             else:
@@ -546,7 +548,8 @@ class PostingThread(QThread):
                     content = self.window.get_random_content_from_json()
                     if not content:
                         self.status_updated.emit(self.window.translate("PostingThread_content_is_empty"))
-                        self.window.stop_posting()
+                        # self.window.stop_posting()
+                        self.stop_requested.emit()
                         return
                     self.content_updated.emit(content)
 
@@ -783,7 +786,9 @@ class PostingThread(QThread):
                 self.status_updated.emit(self.window.translate("PostingThread_failed_to_post_location", url=url, e=str(e)))
                 failed_urls.append(url)
 
-        self.window.stop_posting()  # Dừng đăng bài
+        # self.window.stop_posting()  # Dừng đăng bài
+        self.stop_requested.emit()
+        
         if failed_urls:
             self.status_updated.emit(self.window.translate("PostingThread_all_locations_posted_fail"))
             for failed_url in failed_urls:
@@ -1296,9 +1301,9 @@ Released date: {released_date}
                 thread_obj = getattr(self, thread)
                 if thread_obj.isRunning():
                     thread_obj.quit()
-                    if not thread_obj.wait(2000):  # Chờ tối đa 2 giây
-                        thread_obj.terminate()  # Buộc dừng nếu không phản hồi
-                        self.update_status(self.translate("MainWindow_forced_close", thread=thread))
+                    # if not thread_obj.wait(2000):  # Chờ tối đa 2 giây
+                        # thread_obj.terminate()  # Buộc dừng nếu không phản hồi
+                        # self.update_status(self.translate("MainWindow_forced_close", thread=thread))
                     
         
         # Đóng Chrome Driver nếu tồn tại
@@ -1392,6 +1397,7 @@ Released date: {released_date}
         self.posting_thread = PostingThread(self, location, valid_urls)
         self.posting_thread.status_updated.connect(self.update_status)
         self.posting_thread.content_updated.connect(self.update_content_preview)
+        self.posting_thread.stop_requested.connect(self.stop_posting)
         self.posting_thread.finished.connect(self.reset_buttons)
         self.posting_thread.start()
     
@@ -1409,8 +1415,8 @@ Released date: {released_date}
                 thread_obj = getattr(self, thread)
                 if thread_obj.isRunning():
                     thread_obj.quit()  # Yêu cầu dừng luồng
-                    if not thread_obj.wait(2000):  # Chờ tối đa 2 giây
-                        thread_obj.terminate()
+                    # if not thread_obj.wait(2000):  # Chờ tối đa 2 giây
+                        # thread_obj.terminate()
         
         # Lưu dữ liệu nếu đang fetch
         if hasattr(self, 'fetch_data_thread') and self.fetch_data_thread.isRunning():
