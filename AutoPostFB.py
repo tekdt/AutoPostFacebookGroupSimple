@@ -111,6 +111,17 @@ key_map = {
     "Pages": "pages"
 }
 
+def resource_path(relative_path):
+    """ Lấy đường dẫn tuyệt đối đến tài nguyên, hoạt động cả khi chạy từ EXE và script """
+    if getattr(sys, 'frozen', False):
+        # Trường hợp chạy từ EXE: PyInstaller tạo thư mục tạm '_MEIXXXXXX'
+        base_path = sys._MEIPASS
+    else:
+        # Trường hợp chạy từ script: Lấy đường dẫn thư mục hiện tại
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
 class ChromeDriverThread(QThread):
     driver_ready = pyqtSignal(object)  # Tín hiệu phát ra khi driver sẵn sàng
 
@@ -1755,8 +1766,8 @@ Released date: {released_date}
         else:
             return
 
-        if os.path.exists("language.json"):
-            with open("language.json", "r", encoding="utf-8") as file:
+        if os.path.exists(resource_path("language.json")):
+            with open(resource_path("language.json"), "r", encoding="utf-8") as file:
                 content = file.read().strip()
                 if not content:
                     QMessageBox.warning(self, self.translate("error_title"), self.translate("language_json_file_is_empty"))
@@ -1851,8 +1862,8 @@ Released date: {released_date}
         
     def translate(self, key, **kwargs):
         lang_code = "vi" if self.language_combo.currentText() == "Tiếng Việt" else "en"
-        if os.path.exists("language.json"):
-            with open("language.json", "r", encoding="utf-8") as file:
+        if os.path.exists(resource_path("language.json")):
+            with open(resource_path("language.json"), "r", encoding="utf-8") as file:
                 lang_data = json.load(file)
                 if lang_code in lang_data:
                     message_template = lang_data[lang_code].get(key, key)
