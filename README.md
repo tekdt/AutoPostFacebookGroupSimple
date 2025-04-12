@@ -1,5 +1,5 @@
 
-# Auto Post Facebook Group Simple
+# Auto Post Facebook Simple
 
 - Tác giả: TekDT
 - Email: dinhtrungtek@gmail.com
