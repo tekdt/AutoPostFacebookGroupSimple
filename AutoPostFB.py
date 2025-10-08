@@ -309,11 +309,11 @@ class LoginThread(QThread):
 
         # Đăng nhập thủ công
         try:
-            email_input = self.driver.find_element(By.ID, "m_login_email")
+            email_input = self.driver.find_element(By.ID, "email")
             email_input.send_keys(self.email)
-            password_input = self.driver.find_element(By.ID, "m_login_password")
+            password_input = self.driver.find_element(By.ID, "pass")
             password_input.send_keys(self.password)
-            self.driver.find_element(By.XPATH, "//div[@data-anchor-id='replay' and @role='button']").click()
+            self.driver.find_element(By.XPATH, "//button[@name='login' and @data-testid='royal-login-button' and @type='submit']").click()
             time.sleep(5)
         except NoSuchElementException:
             self.status_updated.emit(self.window.translate("LoginThread_not_found_login_input"))
@@ -366,12 +366,12 @@ class LoginThread(QThread):
             try:
                 # Kiểm tra account đã active chưa (nếu có thì không cần click)
                 WebDriverWait(driver, 3).until(
-                    EC.presence_of_element_located((By.XPATH, f"//a[contains(@href, '/me/') and contains(@class, 'x1i10hfl xjbqb8w xjqpnuy xa49m3k xqeqjp1 x2hbi6w x13fuv20') and @role='link' and @tabindex='0']//span[text()='{sub_account_name}' and @dir='auto']"))
+                    EC.presence_of_element_located((By.XPATH, f"//a[contains(@href, '/me/') and @role='link' and @tabindex='0']//span[text()='{sub_account_name}' and @dir='auto']"))
                 )
             except TimeoutException:
                 # Nếu không tìm thấy account active -> click switch
                 switch_btn = WebDriverWait(driver, 10).until(
-                    EC.element_to_be_clickable((By.XPATH, f"//div[@role='button' and @tabindex='0' and contains(@aria-label, '{sub_account_name}')]"))
+                    EC.element_to_be_clickable((By.XPATH, f"//div[contains(@aria-label, '{sub_account_name}')]//span[text()='{sub_account_name}' and @dir='auto']"))
                 )
                 switch_btn.click()
                 time.sleep(5)
@@ -474,11 +474,11 @@ class FetchDataThread(QThread):
             try:
                 if data_type == "groups":
                     elements = driver.find_elements(
-                        By.XPATH, "//div[@role='listitem' and @style]//div[@class='x1lq5wgf xgqcy7u x30kzoy x9jhf4c x9f619 xktsk01 xl1xv1r']//a[contains(@href, '/groups/') and not(contains(@href, 'category')) and @role='link' and @tabindex='0']"
+                        By.XPATH, "//div[@role='listitem' and @style]//span[@dir='auto']//a[contains(@href, '/groups/') and not(contains(@href, 'category')) and @role='link' and @tabindex='0']"
                     )
                 elif data_type == "members":
                     elements = driver.find_elements(
-                        By.XPATH, "//a[contains(@href, '/groups/') and contains(@href, '/user/') and @tabindex='0' and @role='link']"  # XPath cho liên kết tin nhắn của thành viên
+                        By.XPATH, "//div[@role='list']//div[@data-visualcompletion='ignore-dynamic' and @role='listitem']//div[@aria-disabled='false']//a[contains(@href, '/groups/') and contains(@href, '/user/') and @tabindex='0' and @role='link']"  # XPath cho liên kết tin nhắn của thành viên
                     )
                 
                 current_items_count = len(items)
@@ -602,7 +602,7 @@ class PostingThread(QThread):
             image_paths = random.sample(image_paths, num_images)
         for image_path in image_paths:
             upload_input = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'x9f619 x1n2onr6 x1ja2u2z x78zum5 xdt5ytf x2lah0s x193iq5w')]//input[contains(@accept, 'image/*,image/heif,image/heic,video') and @class='x1s85apg' and @multiple and @type='file']"))
+                EC.presence_of_element_located((By.XPATH, "//div[@aria-labelledby and @role='dialog']//form[@method='POST']//input[contains(@accept, 'image/*,image/heif,image/heic,video') and @class='x1s85apg' and @multiple and @type='file']"))
             )
             upload_input.send_keys(image_path)
             time.sleep(1)
@@ -665,7 +665,7 @@ class PostingThread(QThread):
                     #Tìm tên nhóm
                     try:
                         group_title_element = WebDriverWait(driver, 10).until(
-                            EC.presence_of_element_located((By.XPATH, "//div[@class='x1e56ztr x1xmf6yo']//h1[@dir='auto' and contains(@class, 'html-h1 xdj266r x11i5rnm xat24cr x1mh8g0r xexx8yu')]//a[contains(@class, 'x1i10hfl xjbqb8w x1ejq31n xd10rxx x1sy0etr x17r0tee') and @tabindex='0' and @role='link' and contains(@href, 'https://')]"))
+                            EC.presence_of_element_located((By.XPATH, "//h2[@dir='auto']//span[@dir='auto']//a[@tabindex='0' and @role='link' and contains(@href, 'https://')]"))
                         )
                         group_title = group_title_element.text
                     except:
@@ -674,7 +674,7 @@ class PostingThread(QThread):
                     try:
                         # Nhấn vào nút đăng bài
                         post_box_button = WebDriverWait(driver, 10).until(
-                           EC.element_to_be_clickable((By.XPATH, r"//div[contains(@class, 'x1i10hfl x1ejq31n xd10rxx x1sy0etr x17r0tee x972fbf xcfux6l') and @role='button' and @tabindex='0']//div[@class='xi81zsa x1lkfr7t xkjl1po x1mzt3pk xh8yej3 x13faqbe']//span[@class='x1lliihq x6ikm8r x10wlt62 x1n2onr6' and @style]")) # Tìm ô đăng bài để nhấp vào ngay trên trang chủ của nhóm
+                           EC.element_to_be_clickable((By.XPATH, r"//div[contains(@style, 'border-radius')]//div[@role='button' and @tabindex='0']//span[@class and @style]")) # Tìm ô đăng bài để nhấp vào ngay trên trang chủ của nhóm
                         )
                     except TimeoutException:
                         self.status_updated.emit(self.window.translate("PostingThread_posting_dialog_button_not_found", group_title=group_title, group_id=group_id))
@@ -686,7 +686,7 @@ class PostingThread(QThread):
                     try:
                         # Xác định ô đăng bài
                         post_box = WebDriverWait(driver, 10).until(
-                            EC.visibility_of_element_located((By.XPATH, r"//div[contains(@class, 'xzsf02u x1a2a7pz x1n2onr6 x14wi4xw x9f619 x1lliihq x5yr21d') and @contenteditable='true' and @role='textbox' and @spellcheck='true' and @tabindex='0' and @data-lexical-editor='true' and @aria-placeholder]"))
+                            EC.visibility_of_element_located((By.XPATH, r"//div[@aria-labelledby and @role='dialog']//form[@method='POST']//div[@class and @contenteditable='true' and @role='textbox' and @spellcheck='true' and @tabindex='0' and @data-lexical-editor='true' and @aria-placeholder]"))
                         )
                     except TimeoutException:
                         self.status_updated.emit(self.window.translate("PostingThread_posting_dialog_not_found", group_title=group_title, group_id=group_id))
@@ -707,7 +707,7 @@ class PostingThread(QThread):
                     if (has_images or has_audio or has_video) and not stop_event.is_set():
                         # Xác định nút đính kèm hình ảnh và click vào đó
                         immages_button = WebDriverWait(driver, 10).until(
-                            EC.element_to_be_clickable((By.XPATH, r"//span[contains(@class, 'html-span xdj266r x11i5rnm xat24cr x1mh8g0r xexx8yu x4uap5')]//div[contains(@aria-label, '/video') and contains(@class, 'x1i10hfl x1qjc9v5 xjqpnuy xa49m3k xqeqjp1 x2hbi6w') and @role='button' and @tabindex='0']//div[@class='xc9qbxq x1n2onr6 x14qfxbe x14yjl9h xudhj91 x18nykt9 xww2gxu']//div[@class='x6s0dn4 x78zum5 xl56j7k x1n2onr6 x5yr21d xh8yej3']//img[@class='x1b0d499 xl1xv1r' and contains(@src, '.png') and @alt and @style]"))
+                            EC.element_to_be_clickable((By.XPATH, r"//div[@aria-labelledby and @role='dialog']//form[@method='POST']//div[contains(@aria-label, '/video') and @role='button' and @tabindex='0']//img[contains(@src, '.png') and @alt and @style]"))
                         )
                         immages_button.click()
                         
@@ -717,7 +717,7 @@ class PostingThread(QThread):
                     try:
                         # Nút đăng
                         post_button = WebDriverWait(driver, 10).until(
-                            EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'x9f619 x1ja2u2z x78zum5 x2lah0s x1n2onr6 x1qughib x1qjc9v5')]//div[@role='button' and @tabindex='0' and contains(@class, 'x1i10hfl xjbqb8w x1ejq31n xd10rxx x1sy0etr x17r0tee x972fbf')]//div[@role='none' and contains(@class, 'x9f619 x1n2onr6 x1ja2u2z x193iq5w xeuugli x6s0dn4 x78zum5')]//span[contains(@class, 'x193iq5w xeuugli x13faqbe x1vvkbs x1xmvt09 x1lliihq x1s928wv') and @dir='auto']"))
+                            EC.element_to_be_clickable((By.XPATH, "//div[@aria-labelledby and @role='dialog']//form[@method='POST']//div[@aria-label]//div[@role='none']//span[@dir='auto']"))
                         )
                     except TimeoutException:
                         self.status_updated.emit(self.window.translate("PostingThread_posting_button_not_found", group_title=group_title, group_id=group_id))
@@ -742,7 +742,7 @@ class PostingThread(QThread):
                     try:
                         #Chờ đăng bài thành công và ô đăng bài biến mất
                         WebDriverWait(driver, 60).until(
-                            EC.invisibility_of_element_located((By.XPATH, r"//div[@class='x78zum5 x92rtbv x10l6tqk x1tk7jg1']//div[contains(@class, 'x1i10hfl xjqpnuy xa49m3k xqeqjp1 x2hbi6w x13fuv20 xu3j5b3') and @aria-label and @role='button' and @tabindex='0']//i[contains(@style, '.png') and @data-visualcompletion='css-img' and @class='x1b0d499 x1d69dk1' and @aria-hidden='true']"))
+                            EC.invisibility_of_element_located((By.XPATH, r"//div[@aria-labelledby and @role='dialog']//form[@method='POST']//div[contains(@aria-label, '/video') and @role='button' and @tabindex='0']"))
                         )
                     except TimeoutException:
                         self.status_updated.emit(self.window.translate("PostingThread_posting_dialog_not_disappear", group_title=group_title, group_id=group_id))
