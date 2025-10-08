@@ -31,6 +31,7 @@ import platform
 import subprocess
 import zipfile
 import io
+import stat
 
 # Biến toàn cục để kiểm soát luồng và Selenium
 stop_event = threading.Event()
@@ -132,10 +133,93 @@ class ChromeDriverThread(QThread):
     driver_ready = Signal(object)
     driver_error = Signal(str)
 
-    def __init__(self, window, driver_path, parent=None):
+    def __init__(self, window, parent=None):
         super().__init__(parent)
         self.window = window
-        self.driver_path = driver_path
+        self.driver_path = None
+
+    def _get_compatible_chromedriver(self, browser_version):
+        """
+        Tự động tìm và tải ChromeDriver tương thích cho phiên bản trình duyệt đã cho trên Linux.
+        Sử dụng JSON endpoints chính thức từ Google.
+        """
+        self.window.update_status(f"Đang tìm ChromeDriver tương thích cho trình duyệt phiên bản {browser_version}...")
+        try:
+            # Lấy phiên bản chính (major version)
+            major_version = browser_version.split('.')[0]
+            
+            # Lấy danh sách các phiên bản ChromeDriver có sẵn
+            api_url = "https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json"
+            response = requests.get(api_url)
+            response.raise_for_status()
+            data = response.json()
+
+            # Tìm URL tải về cho phiên bản và kiến trúc phù hợp (linux-arm64)
+            download_url = None
+            # Ưu tiên tìm phiên bản khớp hoàn toàn hoặc gần nhất
+            target_version_info = None
+            for version_info in reversed(data['versions']):
+                if version_info['version'].startswith(major_version):
+                    target_version_info = version_info
+                    break
+            
+            if not target_version_info:
+                self.driver_error.emit(f"Không tìm thấy ChromeDriver nào cho phiên bản major {major_version}.")
+                return None
+
+            # Xác định đúng platform
+            machine_arch = platform.machine()
+            if machine_arch == "aarch64": # ARM64
+                platform_name = "linux-arm64"
+            elif machine_arch == "x86_64": # x64
+                platform_name = "linux-x64"
+            else:
+                self.driver_error.emit(f"Kiến trúc không được hỗ trợ: {machine_arch}")
+                return None
+
+            for download in target_version_info['downloads'].get('chromedriver', []):
+                if download['platform'] == platform_name:
+                    download_url = download['url']
+                    break
+
+            if not download_url:
+                self.driver_error.emit(f"Không tìm thấy link tải ChromeDriver cho platform '{platform_name}' phiên bản {target_version_info['version']}.")
+                return None
+            
+            self.window.update_status(f"Đang tải ChromeDriver từ: {download_url}")
+            
+            # Tải file zip
+            zip_response = requests.get(download_url, stream=True)
+            zip_response.raise_for_status()
+            
+            # Giải nén và lưu file
+            with zipfile.ZipFile(io.BytesIO(zip_response.content)) as z:
+                # Tìm file chromedriver trong zip
+                chromedriver_filename = None
+                for name in z.namelist():
+                    if 'chromedriver' in name and not name.endswith('/'):
+                         chromedriver_filename = name
+                         break
+
+                if not chromedriver_filename:
+                    self.driver_error.emit("Không tìm thấy file chromedriver trong file zip đã tải.")
+                    return None
+
+                # Tạo đường dẫn lưu file
+                output_path = os.path.join(os.path.abspath("."), "chromedriver")
+                with z.open(chromedriver_filename) as source, open(output_path, "wb") as target:
+                    target.write(source.read())
+
+            # Cấp quyền thực thi cho file chromedriver trên Linux/Mac
+            st = os.stat(output_path)
+            os.chmod(output_path, st.st_mode | stat.S_IEXEC)
+            
+            self.window.update_status(f"Tải và cài đặt ChromeDriver thành công tại: {output_path}")
+            return output_path
+
+        except Exception as e:
+            self.driver_error.emit(f"Lỗi khi tự động tải ChromeDriver: {e}")
+            return None
 
     def run(self):
         try:
@@ -143,12 +227,11 @@ class ChromeDriverThread(QThread):
             options.add_argument("--disable-notifications")
             desktop_user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
             options.add_argument(f"user-agent={desktop_user_agent}")
+            options.add_experimental_option("detach", True)
 
             if self.window.headless_check.isChecked():
-                options.add_argument("--headless")
+                options.add_argument("--headless=new")
                 options.add_argument("--disable-gpu")
-                if platform.system() == "Linux":
-                    options.add_argument("--window-size=1920,1080")
 
             if self.window.profile_check.isChecked():
                 profile_path = self.window.profile_path if hasattr(self.window, 'profile_path') else None
@@ -156,34 +239,70 @@ class ChromeDriverThread(QThread):
                     options.add_argument(f"user-data-dir={profile_path}")
                     options.add_argument("--profile-directory=Default")
             
-            options.add_experimental_option("detach", True)
-            
-            # Cấu hình riêng cho Linux
+            # --- Cấu hình riêng cho Linux ---
             if platform.system() == "Linux":
                 self.window.update_status("Phát hiện hệ điều hành Linux. Áp dụng cấu hình riêng...")
                 options.add_argument("--no-sandbox")
                 options.add_argument("--disable-dev-shm-usage")
                 
-                # Kiểm tra các đường dẫn trình duyệt phổ biến trên Linux
-                browser_locations = ["/usr/bin/google-chrome-stable", "/snap/bin/chromium", "/usr/bin/chromium-browser"]
-                browser_found = False
+                browser_locations = ["/usr/bin/google-chrome-stable", "/usr/bin/chromium-browser", "/snap/bin/chromium"]
+                browser_path = None
                 for loc in browser_locations:
                     if os.path.exists(loc):
-                        options.binary_location = loc
-                        self.window.update_status(f"Tìm thấy trình duyệt tại: {loc}")
-                        browser_found = True
+                        browser_path = loc
+                        options.binary_location = browser_path
+                        self.window.update_status(f"Tìm thấy trình duyệt tại: {browser_path}")
                         break
-                if not browser_found:
+                
+                if not browser_path:
                     self.driver_error.emit("Không tìm thấy trình duyệt Chrome/Chromium trên hệ thống.")
                     return
 
-            self.window.update_status("Đang khởi tạo service với chromedriver đã tải...")
-            service = Service(executable_path=self.driver_path)
-            
+                try:
+                    version_output = subprocess.check_output([browser_path, "--version"], text=True).strip()
+                    match = re.search(r'(\d+\.\d+\.\d+\.\d+)', version_output)
+                    if not match:
+                         self.driver_error.emit(f"Không thể xác định phiên bản từ chuỗi: '{version_output}'")
+                         return
+                    browser_version = match.group(1)
+                    self.window.update_status(f"Phiên bản trình duyệt: {browser_version}")
+                except Exception as e:
+                    self.driver_error.emit(f"Không thể lấy phiên bản trình duyệt: {e}")
+                    return
+                
+                machine_arch = platform.machine()
+                # Nếu là kiến trúc ARM, bỏ qua webdriver-manager và dùng phương pháp tải thủ công
+                if machine_arch == "aarch64" or machine_arch == "arm64":
+                    self.window.update_status(f"Phát hiện kiến trúc ARM ({machine_arch}). Sử dụng phương pháp tải driver tùy chỉnh.")
+                    self.driver_path = self._get_compatible_chromedriver(browser_version)
+                    if not self.driver_path:
+                        return
+                    service = Service(executable_path=self.driver_path)
+                # Với các kiến trúc Linux khác (x86_64), thử webdriver-manager trước
+                else:
+                    try:
+                        self.window.update_status("Thử sử dụng webdriver-manager để tải chromedriver...")
+                        service = Service(ChromeDriverManager().install())
+                        self.driver_path = service.path
+                    except Exception as e:
+                        self.window.update_status(f"webdriver-manager thất bại ({e}). Chuyển sang phương pháp tải thủ công.")
+                        self.driver_path = self._get_compatible_chromedriver(browser_version)
+                        if not self.driver_path:
+                            return
+                        service = Service(executable_path=self.driver_path)
+
+            # Cấu hình cho Windows và các hệ điều hành khác
+            else:
+                self.window.update_status("Đang sử dụng webdriver-manager để quản lý chromedriver...")
+                service = Service(ChromeDriverManager().install())
+
+            self.window.update_status("Đang khởi tạo Chrome Driver...")
             driver_instance = webdriver.Chrome(service=service, options=options)
             self.driver_ready.emit(driver_instance)
+
         except Exception as e:
-            error_msg = f"Không thể khởi tạo Chrome Driver: {e}"
+            import traceback
+            error_msg = f"Không thể khởi tạo Chrome Driver: {e}\n{traceback.format_exc()}"
             self.driver_error.emit(error_msg)
 
 class ChromeMonitorThread(QThread):
@@ -1342,11 +1461,7 @@ Released date: {released_date}
             if hasattr(self, thread):
                 thread_obj = getattr(self, thread)
                 if thread_obj.isRunning():
-                    thread_obj.quit()
-                    # if not thread_obj.wait(2000):  # Chờ tối đa 2 giây
-                        # thread_obj.terminate()  # Buộc dừng nếu không phản hồi
-                        # self.update_status(self.translate("MainWindow_forced_close", thread=thread))
-                    
+                    thread_obj.quit()                    
         
         # Đóng Chrome Driver nếu tồn tại
         if self.driver is not None:
@@ -1402,16 +1517,7 @@ Released date: {released_date}
                     QMessageBox.warning(self, self.translate("error_title"), self.translate("MainWindow_url_is_invalid"))
                     return
         
-        try:
-            self.update_status("Đang sử dụng webdriver-manager để tải/quản lý chromedriver...")
-            # Dòng này sẽ chạy trong luồng chính, có thể làm treo GUI vài giây
-            self.driver_path = ChromeDriverManager().install() 
-            self.update_status(f"ChromeDriver đã sẵn sàng tại: {self.driver_path}")
-        except Exception as e:
-            error_msg = f"Tải chromedriver thất bại: {e}\n\nVui lòng kiểm tra kết nối mạng và thử lại."
-            self.update_status(error_msg)
-            QMessageBox.critical(self, "Lỗi Tải Driver", error_msg)
-            return # Dừng lại nếu không tải được
+        # Bỏ phần cài đặt driver ở đây. Việc này sẽ được thực hiện trong Thread.
 
         stop_event.clear()
         # Vô hiệu hóa tất cả control và kích hoạt nút "Dừng"
@@ -1419,7 +1525,11 @@ Released date: {released_date}
         
         # Nếu tất cả kiểm tra đều qua, khởi động driver
         if self.driver is None:
-            self.init_driver()
+            # ChromeDriverThread sẽ tự xử lý việc tải và cài đặt driver
+            self.chrome_driver_thread = ChromeDriverThread(self)
+            self.chrome_driver_thread.driver_ready.connect(self.set_driver)
+            self.chrome_driver_thread.driver_error.connect(self.handle_driver_error)
+            self.chrome_driver_thread.start()
         else:
             self.start_login()
         
