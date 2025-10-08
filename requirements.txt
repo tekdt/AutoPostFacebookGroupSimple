@@ -1,0 +1,8 @@
+requests
+PySide6
+selenium
+openai
+mistralai
+groq
+google-generativeai
+psutil
