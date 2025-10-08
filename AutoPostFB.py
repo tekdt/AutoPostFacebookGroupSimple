@@ -9,6 +9,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from selenium.webdriver.chrome.service import Service
 from openai import OpenAI
 from mistralai import Mistral
 import groq
@@ -25,13 +26,17 @@ import re
 import csv
 import glob
 import hashlib
+import platform
+import subprocess
+import zipfile
+import io
 
 # Biến toàn cục để kiểm soát luồng và Selenium
 stop_event = threading.Event()
 driver = None
 COOKIE_FILE = "facebook_cookies.pkl"
-version = "2.0.0"
-released_date = "11/04/2025"
+version = "2.0.1"
+released_date = "08/10/2025"
 
 # Định nghĩa các định dạng file cần kiểm tra
 image_extensions = [
@@ -122,38 +127,139 @@ def resource_path(relative_path):
 
     return os.path.join(base_path, relative_path)
 
+def install_or_update_chromedriver_linux(parent_window):
+    """
+    Tự động kiểm tra, tải và cài đặt chromedriver cho Linux.
+    Yêu cầu quyền sudo để ghi vào /usr/local/bin.
+    """
+    chromedriver_path = "/usr/local/bin/chromedriver"
+    if os.path.exists(chromedriver_path):
+        parent_window.update_status("ChromeDriver đã tồn tại tại: " + chromedriver_path)
+        return True
+
+    # Yêu cầu xác nhận từ người dùng
+    reply = QMessageBox.question(parent_window, 'Cài đặt ChromeDriver',
+                                     "Không tìm thấy ChromeDriver. Bạn có muốn tự động tải và cài đặt phiên bản mới nhất không? (Yêu cầu quyền admin)",
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+    if reply == QMessageBox.StandardButton.No:
+        parent_window.update_status("Người dùng đã từ chối cài đặt ChromeDriver.")
+        return False
+
+    password, ok = QInputDialog.getText(parent_window, 'Yêu cầu quyền Admin', 'Vui lòng nhập mật khẩu sudo của bạn:', QLineEdit.EchoMode.Password)
+    if not ok:
+        parent_window.update_status("Đã hủy quá trình nhập mật khẩu.")
+        return False
+
+    try:
+        # Lấy phiên bản Electron mới nhất để tải chromedriver tương ứng
+        release_url = "https://api.github.com/repos/electron/electron/releases/latest"
+        response = requests.get(release_url)
+        response.raise_for_status()
+        latest_version = response.json()["name"].lstrip("v")
+        parent_window.update_status(f"Tìm thấy phiên bản mới nhất: {latest_version}")
+
+        # Xác định kiến trúc hệ thống
+        arch = platform.machine()
+        if arch == "x86_64":
+            arch_suffix = "x64"
+        elif arch == "aarch64":
+            arch_suffix = "arm64"
+        else:
+            QMessageBox.critical(parent_window, "Lỗi", f"Kiến trúc không được hỗ trợ: {arch}")
+            return False
+
+        # Xây dựng URL tải xuống
+        zip_filename = f"chromedriver-v{latest_version}-linux-{arch_suffix}.zip"
+        download_url = f"https://github.com/electron/electron/releases/download/v{latest_version}/{zip_filename}"
+        parent_window.update_status(f"Đang tải từ: {download_url}")
+
+        # Tải tệp zip
+        response = requests.get(download_url, stream=True)
+        response.raise_for_status()
+        zip_file = zipfile.ZipFile(io.BytesIO(response.content))
+        
+        # Giải nén
+        zip_file.extractall(path="/tmp") # Giải nén vào thư mục tạm
+        parent_window.update_status("Giải nén thành công vào /tmp/.")
+
+        # Sử dụng sudo để di chuyển, thay đổi quyền và dọn dẹp
+        commands = [
+            f"mv /tmp/chromedriver {chromedriver_path}",
+            f"chmod +x {chromedriver_path}"
+        ]
+        
+        for command in commands:
+            parent_window.update_status(f"Đang chạy lệnh: sudo {command}")
+            proc = subprocess.Popen(f'echo "{password}" | sudo -S {command}', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            stdout, stderr = proc.communicate()
+            if proc.returncode != 0:
+                error_message = f"Lỗi khi thực thi '{command}': {stderr}"
+                parent_window.update_status(error_message)
+                QMessageBox.critical(parent_window, "Lỗi cài đặt", error_message)
+                return False
+        
+        parent_window.update_status("Cài đặt ChromeDriver thành công!")
+        return True
+
+    except Exception as e:
+        error_message = f"Đã xảy ra lỗi trong quá trình cài đặt ChromeDriver: {e}"
+        parent_window.update_status(error_message)
+        QMessageBox.critical(parent_window, "Lỗi", error_message)
+        return False
+
 class ChromeDriverThread(QThread):
-    driver_ready = Signal(object)  # Tín hiệu phát ra khi driver sẵn sàng
+    driver_ready = Signal(object)
+    driver_error = Signal(str)
 
     def __init__(self, window, parent=None):
         super().__init__(parent)
-        self.window = window  # Tham chiếu đến MainWindow để truy cập các thuộc tính như profile_check
+        self.window = window
 
     def run(self):
-        # Cấu hình ChromeOptions
-        options = webdriver.ChromeOptions()
-        options.add_argument("--disable-notifications")
-        desktop_user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-        options.add_argument(f"user-agent={desktop_user_agent}")
+        try:
+            options = webdriver.ChromeOptions()
+            options.add_argument("--disable-notifications")
+            desktop_user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            options.add_argument(f"user-agent={desktop_user_agent}")
 
-        # Kiểm tra checkbox headless
-        if self.window.headless_check.isChecked():
-            options.add_argument("--headless")
-            options.add_argument("--disable-gpu")  # Cần thiết cho headless trên một số hệ thống
-        
-        # Sử dụng profile Chrome nếu được chọn
-        if self.window.profile_check.isChecked():
-            profile_path = self.window.profile_path if hasattr(self.window, 'profile_path') else None
-            if profile_path:
-                options.add_argument(f"user-data-dir={profile_path}")
-                options.add_argument("--profile-directory=Default")
+            if self.window.headless_check.isChecked():
+                options.add_argument("--headless")
+                options.add_argument("--disable-gpu")
 
-        # Khởi tạo driver
-        driver = webdriver.Chrome(options=options)
-        options.add_experimental_option("detach", True)
+            if self.window.profile_check.isChecked():
+                profile_path = self.window.profile_path if hasattr(self.window, 'profile_path') else None
+                if profile_path:
+                    options.add_argument(f"user-data-dir={profile_path}")
+                    options.add_argument("--profile-directory=Default")
+            
+            options.add_experimental_option("detach", True)
+            
+            driver_instance = None
+            # Cấu hình riêng cho Linux
+            if platform.system() == "Linux":
+                if not install_or_update_chromedriver_linux(self.window):
+                    self.driver_error.emit("Không thể cài đặt hoặc xác minh ChromeDriver trên Linux.")
+                    return
 
-        # Phát tín hiệu rằng driver đã sẵn sàng
-        self.driver_ready.emit(driver)
+                options.add_argument("--no-sandbox")
+                options.add_argument("--disable-dev-shm-usage")
+                
+                # Kiểm tra các đường dẫn trình duyệt phổ biến trên Linux
+                browser_locations = ["/usr/bin/google-chrome-stable", "/snap/bin/chromium"]
+                for loc in browser_locations:
+                    if os.path.exists(loc):
+                        options.binary_location = loc
+                        break
+                
+                chromedriver_path = "/usr/local/bin/chromedriver"
+                service = Service(executable_path=chromedriver_path)
+                driver_instance = webdriver.Chrome(service=service, options=options)
+            else: # Cấu hình cho Windows và các hệ điều hành khác
+                driver_instance = webdriver.Chrome(options=options)
+
+            self.driver_ready.emit(driver_instance)
+        except Exception as e:
+            self.driver_error.emit(f"Không thể khởi tạo Chrome Driver: {e}")
 
 class ChromeMonitorThread(QThread):
     chrome_closed = Signal()
@@ -893,13 +999,25 @@ class MainWindow(QMainWindow):
         self.driver_ready = False
     
     def init_driver(self):
+        self.update_status("Đang khởi tạo Chrome Driver...")
         self.chrome_driver_thread = ChromeDriverThread(self)
         self.chrome_driver_thread.driver_ready.connect(self.set_driver)
+        
+        self.chrome_driver_thread.driver_error.connect(self.handle_driver_error)
         self.chrome_driver_thread.start()
 
+    def handle_driver_error(self, error_message):
+        self.update_status(f"LỖI: {error_message}")
+        QMessageBox.critical(self, "Lỗi Driver", error_message)
+        self.stop_posting()
+
     def set_driver(self, driver):
+        if driver is None:
+            self.handle_driver_error("Đối tượng driver nhận được là None.")
+            return
         self.driver = driver
         self.driver_ready = True
+        self.update_status("Chrome Driver đã sẵn sàng.")
         # Khởi động ChromeMonitorThread
         self.chrome_monitor = ChromeMonitorThread()
         self.chrome_monitor.chrome_closed.connect(self.handle_chrome_closed)
