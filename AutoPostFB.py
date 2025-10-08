@@ -1,7 +1,7 @@
 import requests
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QGroupBox,
                              QLabel, QLineEdit, QPushButton, QCheckBox, QComboBox, QListWidget, QTextEdit,
-                             QTabWidget, QFileDialog, QMessageBox)
+                             QTabWidget, QFileDialog, QMessageBox, QInputDialog)
 from PySide6.QtCore import Qt, QThread, Signal
 from selenium import webdriver
 from selenium.webdriver.common.by import By
