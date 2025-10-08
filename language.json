@@ -58,7 +58,7 @@
 		"FetchDataThread_stopped_to_get_data_by_request": "⛔Đã dừng lấy dữ liệu theo yêu cầu",
 		"FetchDataThread_could_not_get_data": "❌Không thể lấy được {tmp_data_type}. Vui lòng kiểm tra lại.",
 		"FetchDataThread_error_during_fetching_data": "❌Lỗi khi lấy dữ liệu: {e}",
-		"FetchDataThread_start_fetching_data": "🟢Bắt đầu lấy dữ liệu {data_type} từ {ur}",
+		"FetchDataThread_start_fetching_data": "🟢Bắt đầu lấy dữ liệu {data_type} từ {url}",
 		"FetchDataThread_provide_group_url": "⚠️Vui lòng cung cấp URL nhóm để lấy danh sách thành viên",
 		"FetchDataThread_saved_items_to_settings": "Đã lưu {count_items} liên kết từ {data_type} vào settings.json",
 		"FetchDataThread_fetched_items": "👍Đã lấy được {count_items} từ {data_type}. Đang tải thêm...",
