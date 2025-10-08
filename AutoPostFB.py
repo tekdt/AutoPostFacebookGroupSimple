@@ -1,8 +1,8 @@
 import requests
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QGroupBox,
+from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QGroupBox,
                              QLabel, QLineEdit, QPushButton, QCheckBox, QComboBox, QListWidget, QTextEdit,
                              QTabWidget, QFileDialog, QMessageBox)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PySide6.QtCore import Qt, QThread, Signal
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -123,7 +123,7 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 class ChromeDriverThread(QThread):
-    driver_ready = pyqtSignal(object)  # Tín hiệu phát ra khi driver sẵn sàng
+    driver_ready = Signal(object)  # Tín hiệu phát ra khi driver sẵn sàng
 
     def __init__(self, window, parent=None):
         super().__init__(parent)
@@ -156,7 +156,7 @@ class ChromeDriverThread(QThread):
         self.driver_ready.emit(driver)
 
 class ChromeMonitorThread(QThread):
-    chrome_closed = pyqtSignal()
+    chrome_closed = Signal()
 
     def run(self):
         while True:
@@ -173,8 +173,8 @@ class ChromeMonitorThread(QThread):
         return False
 
 class LoginThread(QThread):
-    login_success = pyqtSignal()
-    status_updated = pyqtSignal(str)
+    login_success = Signal()
+    status_updated = Signal(str)
 
     def __init__(self, window, parent=None):
         super().__init__(parent)
@@ -279,9 +279,9 @@ class LoginThread(QThread):
             self.status_updated.emit(self.window.translate("LoginThread_could_not_switch_to_sub_account", sub_account_name=sub_account_name, e=str(e)))
 
 class FetchDataThread(QThread):
-    fetch_completed = pyqtSignal()
-    fetch_failed = pyqtSignal(str)
-    status_updated = pyqtSignal(str)
+    fetch_completed = Signal()
+    fetch_failed = Signal(str)
+    status_updated = Signal(str)
 
     def __init__(self, window, data_type, url=None, parent=None):
         super().__init__(parent)
@@ -452,9 +452,9 @@ class FetchDataThread(QThread):
         driver.execute_script(f"window.scrollTo(0, {target_y});")
 
 class PostingThread(QThread):
-    status_updated = pyqtSignal(str)
-    content_updated = pyqtSignal(str)
-    stop_requested = pyqtSignal()
+    status_updated = Signal(str)
+    content_updated = Signal(str)
+    stop_requested = Signal()
     
     def __init__(self, window, location, valid_urls, parent=None):
         super().__init__(parent)
@@ -827,7 +827,7 @@ class PostingThread(QThread):
         # Hiện tại chỉ đăng 1 bài nhưng có thể mở rộng bằng vòng lặp
 
 class UpdateChecker(QThread):
-    update_status = pyqtSignal(str)
+    update_status = Signal(str)
 
     def __init__(self, window, parent=None):
         super().__init__(parent)
