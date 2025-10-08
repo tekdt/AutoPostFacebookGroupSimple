@@ -359,7 +359,7 @@ class LoginThread(QThread):
         sub_account_name = self.window.sub_account_entry.text().strip()
         try:
             account_menu = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.XPATH, "//div[@aria-expanded and contains(@class, 'x1i10hfl x1qjc9v5 xjbqb8w xjqpnuy xa49m3k xqeqjp1 x2hbi6w') and @role='button' and @tabindex='0']"))
+                EC.presence_of_element_located((By.XPATH, "//span[@class]//div[@aria-expanded and @aria-label and @role='button' and @tabindex='0']//div[@aria-hidden='true' and @style]"))
             )
             account_menu.click()
             time.sleep(2)
