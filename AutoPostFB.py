@@ -10,6 +10,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 from openai import OpenAI
 from mistralai import Mistral
 import groq
@@ -127,93 +128,14 @@ def resource_path(relative_path):
 
     return os.path.join(base_path, relative_path)
 
-def install_or_update_chromedriver_linux(parent_window):
-    """
-    Tự động kiểm tra, tải và cài đặt chromedriver cho Linux.
-    Yêu cầu quyền sudo để ghi vào /usr/local/bin.
-    """
-    chromedriver_path = "/usr/local/bin/chromedriver"
-    if os.path.exists(chromedriver_path):
-        parent_window.update_status("ChromeDriver đã tồn tại tại: " + chromedriver_path)
-        return True
-
-    # Yêu cầu xác nhận từ người dùng
-    reply = QMessageBox.question(parent_window, 'Cài đặt ChromeDriver',
-                                     "Không tìm thấy ChromeDriver. Bạn có muốn tự động tải và cài đặt phiên bản mới nhất không? (Yêu cầu quyền admin)",
-                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-    if reply == QMessageBox.StandardButton.No:
-        parent_window.update_status("Người dùng đã từ chối cài đặt ChromeDriver.")
-        return False
-
-    password, ok = QInputDialog.getText(parent_window, 'Yêu cầu quyền Admin', 'Vui lòng nhập mật khẩu sudo của bạn:', QLineEdit.EchoMode.Password)
-    if not ok:
-        parent_window.update_status("Đã hủy quá trình nhập mật khẩu.")
-        return False
-
-    try:
-        # Lấy phiên bản Electron mới nhất để tải chromedriver tương ứng
-        release_url = "https://api.github.com/repos/electron/electron/releases/latest"
-        response = requests.get(release_url)
-        response.raise_for_status()
-        latest_version = response.json()["name"].lstrip("v")
-        parent_window.update_status(f"Tìm thấy phiên bản mới nhất: {latest_version}")
-
-        # Xác định kiến trúc hệ thống
-        arch = platform.machine()
-        if arch == "x86_64":
-            arch_suffix = "x64"
-        elif arch == "aarch64":
-            arch_suffix = "arm64"
-        else:
-            QMessageBox.critical(parent_window, "Lỗi", f"Kiến trúc không được hỗ trợ: {arch}")
-            return False
-
-        # Xây dựng URL tải xuống
-        zip_filename = f"chromedriver-v{latest_version}-linux-{arch_suffix}.zip"
-        download_url = f"https://github.com/electron/electron/releases/download/v{latest_version}/{zip_filename}"
-        parent_window.update_status(f"Đang tải từ: {download_url}")
-
-        # Tải tệp zip
-        response = requests.get(download_url, stream=True)
-        response.raise_for_status()
-        zip_file = zipfile.ZipFile(io.BytesIO(response.content))
-        
-        # Giải nén
-        zip_file.extractall(path="/tmp") # Giải nén vào thư mục tạm
-        parent_window.update_status("Giải nén thành công vào /tmp/.")
-
-        # Sử dụng sudo để di chuyển, thay đổi quyền và dọn dẹp
-        commands = [
-            f"mv /tmp/chromedriver {chromedriver_path}",
-            f"chmod +x {chromedriver_path}"
-        ]
-        
-        for command in commands:
-            parent_window.update_status(f"Đang chạy lệnh: sudo {command}")
-            proc = subprocess.Popen(f'echo "{password}" | sudo -S {command}', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            stdout, stderr = proc.communicate()
-            if proc.returncode != 0:
-                error_message = f"Lỗi khi thực thi '{command}': {stderr}"
-                parent_window.update_status(error_message)
-                QMessageBox.critical(parent_window, "Lỗi cài đặt", error_message)
-                return False
-        
-        parent_window.update_status("Cài đặt ChromeDriver thành công!")
-        return True
-
-    except Exception as e:
-        error_message = f"Đã xảy ra lỗi trong quá trình cài đặt ChromeDriver: {e}"
-        parent_window.update_status(error_message)
-        QMessageBox.critical(parent_window, "Lỗi", error_message)
-        return False
-
 class ChromeDriverThread(QThread):
     driver_ready = Signal(object)
     driver_error = Signal(str)
 
-    def __init__(self, window, parent=None):
+    def __init__(self, window, driver_path, parent=None):
         super().__init__(parent)
         self.window = window
+        self.driver_path = driver_path
 
     def run(self):
         try:
@@ -225,6 +147,8 @@ class ChromeDriverThread(QThread):
             if self.window.headless_check.isChecked():
                 options.add_argument("--headless")
                 options.add_argument("--disable-gpu")
+                if platform.system() == "Linux":
+                    options.add_argument("--window-size=1920,1080")
 
             if self.window.profile_check.isChecked():
                 profile_path = self.window.profile_path if hasattr(self.window, 'profile_path') else None
@@ -234,32 +158,33 @@ class ChromeDriverThread(QThread):
             
             options.add_experimental_option("detach", True)
             
-            driver_instance = None
             # Cấu hình riêng cho Linux
             if platform.system() == "Linux":
-                if not install_or_update_chromedriver_linux(self.window):
-                    self.driver_error.emit("Không thể cài đặt hoặc xác minh ChromeDriver trên Linux.")
-                    return
-
+                self.window.update_status("Phát hiện hệ điều hành Linux. Áp dụng cấu hình riêng...")
                 options.add_argument("--no-sandbox")
                 options.add_argument("--disable-dev-shm-usage")
                 
                 # Kiểm tra các đường dẫn trình duyệt phổ biến trên Linux
-                browser_locations = ["/usr/bin/google-chrome-stable", "/snap/bin/chromium"]
+                browser_locations = ["/usr/bin/google-chrome-stable", "/snap/bin/chromium", "/usr/bin/chromium-browser"]
+                browser_found = False
                 for loc in browser_locations:
                     if os.path.exists(loc):
                         options.binary_location = loc
+                        self.window.update_status(f"Tìm thấy trình duyệt tại: {loc}")
+                        browser_found = True
                         break
-                
-                chromedriver_path = "/usr/local/bin/chromedriver"
-                service = Service(executable_path=chromedriver_path)
-                driver_instance = webdriver.Chrome(service=service, options=options)
-            else: # Cấu hình cho Windows và các hệ điều hành khác
-                driver_instance = webdriver.Chrome(options=options)
+                if not browser_found:
+                    self.driver_error.emit("Không tìm thấy trình duyệt Chrome/Chromium trên hệ thống.")
+                    return
 
+            self.window.update_status("Đang khởi tạo service với chromedriver đã tải...")
+            service = Service(executable_path=self.driver_path)
+            
+            driver_instance = webdriver.Chrome(service=service, options=options)
             self.driver_ready.emit(driver_instance)
         except Exception as e:
-            self.driver_error.emit(f"Không thể khởi tạo Chrome Driver: {e}")
+            error_msg = f"Không thể khởi tạo Chrome Driver: {e}"
+            self.driver_error.emit(error_msg)
 
 class ChromeMonitorThread(QThread):
     chrome_closed = Signal()
@@ -1000,9 +925,8 @@ class MainWindow(QMainWindow):
     
     def init_driver(self):
         self.update_status("Đang khởi tạo Chrome Driver...")
-        self.chrome_driver_thread = ChromeDriverThread(self)
+        self.chrome_driver_thread = ChromeDriverThread(self, self.driver_path)
         self.chrome_driver_thread.driver_ready.connect(self.set_driver)
-        
         self.chrome_driver_thread.driver_error.connect(self.handle_driver_error)
         self.chrome_driver_thread.start()
 
@@ -1478,6 +1402,17 @@ Released date: {released_date}
                     QMessageBox.warning(self, self.translate("error_title"), self.translate("MainWindow_url_is_invalid"))
                     return
         
+        try:
+            self.update_status("Đang sử dụng webdriver-manager để tải/quản lý chromedriver...")
+            # Dòng này sẽ chạy trong luồng chính, có thể làm treo GUI vài giây
+            self.driver_path = ChromeDriverManager().install() 
+            self.update_status(f"ChromeDriver đã sẵn sàng tại: {self.driver_path}")
+        except Exception as e:
+            error_msg = f"Tải chromedriver thất bại: {e}\n\nVui lòng kiểm tra kết nối mạng và thử lại."
+            self.update_status(error_msg)
+            QMessageBox.critical(self, "Lỗi Tải Driver", error_msg)
+            return # Dừng lại nếu không tải được
+
         stop_event.clear()
         # Vô hiệu hóa tất cả control và kích hoạt nút "Dừng"
         self.disable_all_controls()

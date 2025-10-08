@@ -6,3 +6,4 @@ mistralai
 groq
 google-generativeai
 psutil
+webdriver-manager
