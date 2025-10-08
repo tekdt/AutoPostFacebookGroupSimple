@@ -789,18 +789,18 @@ class PostingThread(QThread):
                     
                     #Kiểm tra xem có xuất hiện yêu cầu nhập mã hóa tin nhắn đầu cuối hay không
                     try:
-                        encrypt_dialog_input = driver.find_element(By.XPATH, r"//div[@class='x1n2onr6']//input[contains(@class, 'x1i10hfl x9f619 xggy1nq xtpw4lu x1tutvks x1s3xk63 x1s07b3s') and @dir='ltr' and @autocomplete='one-time-code' and @id='mw-numeric-code-input-prevent-composer-focus-steal' and @maxlength='6' and @type='text' and @value and @tabindex='0']")
+                        encrypt_dialog_input = driver.find_element(By.XPATH, r"//input[@class and @dir='ltr' and @autocomplete='one-time-code' and @id='mw-numeric-code-input-prevent-composer-focus-steal' and @maxlength='6' and @type='text' and @value and @tabindex='0']")
                         if encrypt_dialog_input:
                             encrypt_dialog_input.send_keys(encrypt_code)
                             WebDriverWait(driver, 30).until_not(
-                                EC.presence_of_element_located((By.XPATH, r"//div[@class='x1n2onr6']//input[contains(@class, 'x1i10hfl x9f619 xggy1nq xtpw4lu x1tutvks x1s3xk63 x1s07b3s') and @dir='ltr' and @autocomplete='one-time-code' and @id='mw-numeric-code-input-prevent-composer-focus-steal' and @maxlength='6' and @type='text' and @value and @tabindex='0']"))
+                                EC.presence_of_element_located((By.XPATH, r"//input[@class and @dir='ltr' and @autocomplete='one-time-code' and @id='mw-numeric-code-input-prevent-composer-focus-steal' and @maxlength='6' and @type='text' and @value and @tabindex='0']"))
                             )
                     except:
                         pass
                     
                     # Nút tiếp tục mã hoá tin nhắn đầu cuối
                     try:
-                        continue_encrypt_button = driver.find_element(By.XPATH, r"//div[contains(@class, 'x9f619 x1n2onr6 x1ja2u2z x78zum5 xdt5ytf x2lah0s x193iq5w')]//div[@aria-label and contains(@class, 'x1i10hfl xjbqb8w x1ejq31n xd10rxx x1sy0etr x17r0tee x972fbf') and @role='button' and @tabindex='0']//span[contains(@class, 'x1lliihq x6ikm8r x10wlt62 x1n2onr6 xlyipyv xuxw1ft')]")
+                        continue_encrypt_button = driver.find_element(By.XPATH, r"//div[@aria-label and @role='button' and @tabindex='0']//div[@role='none']//span[@dir='auto']")
                         if continue_encrypt_button:
                             continue_encrypt_button.click()
                     except:
@@ -829,7 +829,7 @@ class PostingThread(QThread):
                     try:
                         # Xác định nút gửi tin nhắn và click vào đó
                         send_button = WebDriverWait(driver, 10).until(
-                            EC.element_to_be_clickable((By.XPATH, r"//span[contains(@class, 'html-span xdj266r x11i5rnm xat24cr x1mh8g0r xexx8yu x4uap5')]//div[@role='button' and @tabindex='0' and contains(@aria-label, 'Enter') and contains(@class, 'x1i10hfl x1qjc9v5 xjbqb8w xjqpnuy xa49m3k xqeqjp1')]"))
+                            EC.element_to_be_clickable((By.XPATH, r"//div[@role='button' and @tabindex='0' and contains(@aria-label, 'Enter')]"))
                         )
                     except:
                         self.status_updated.emit(self.window.translate("PostingThread_not_found_send_button", user_name=user_name, user_id=user_id))
@@ -863,13 +863,13 @@ class PostingThread(QThread):
                         
                     # Chờ cho nút gửi biến mất
                     WebDriverWait(driver, 60).until(
-                        EC.invisibility_of_element_located((By.XPATH, r"//span[contains(@class, 'html-span xdj266r x11i5rnm xat24cr x1mh8g0r xexx8yu x4uap5')]//div[@role='button' and @tabindex='0' and contains(@aria-label, 'Enter') and contains(@class, 'x1i10hfl x1qjc9v5 xjbqb8w xjqpnuy xa49m3k xqeqjp1')]"))
+                        EC.invisibility_of_element_located((By.XPATH, r"//div[@role='button' and @tabindex='0' and contains(@aria-label, 'Enter')]"))
                     )
                     
                     try:
                         #Chờ gửi tin nhắn thành công và nút gửi tin nhắn biến mất
                         WebDriverWait(driver, 60).until(
-                            EC.invisibility_of_element_located((By.XPATH, r"//span[contains(@class, 'html-span xdj266r x11i5rnm xat24cr x1mh8g0r xexx8yu x4uap5')]//div[@role='button' and @tabindex='0' and contains(@aria-label, 'Enter') and contains(@class, 'x1i10hfl x1qjc9v5 xjbqb8w xjqpnuy xa49m3k xqeqjp1')]"))
+                            EC.invisibility_of_element_located((By.XPATH, r"//div[@role='button' and @tabindex='0' and contains(@aria-label, 'Enter')]"))
                         )
                     except TimeoutException:
                         self.status_updated.emit(self.window.translate("PostingThread_send_button_not_disappear", user_name=user_name, user_id=user_id))
