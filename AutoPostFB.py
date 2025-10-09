@@ -244,6 +244,7 @@ class ChromeDriverThread(QThread):
                 self.window.update_status("Phát hiện hệ điều hành Linux. Áp dụng cấu hình riêng...")
                 options.add_argument("--no-sandbox")
                 options.add_argument("--disable-dev-shm-usage")
+                options.add_argument("--disable-setuid-sandbox")
                 
                 browser_locations = ["/usr/bin/google-chrome-stable", "/usr/bin/chromium-browser", "/snap/bin/chromium"]
                 browser_path = None
